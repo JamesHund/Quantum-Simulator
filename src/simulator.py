@@ -37,7 +37,7 @@ def print_complex_matrix(matrix):
     print(tabulate(formatted_matrix, tablefmt="grid"))
 
 
-def apply_gate(gate_name, statevector):
+def get_gate_matrix(gate_name):
     # Define quantum gates as matrices
     x = np.array([[0, 1], [1, 0]])
     y = np.array([[0, -1j], [1j, 0]])
@@ -69,41 +69,93 @@ def apply_gate(gate_name, statevector):
     else:
         raise ValueError(f"Unknown gate: {gate_name}")
     
-    print(f"Applying gate {gate_name}:")
-    print_complex_matrix(gate)
-    # Apply the gate
-    return np.dot(gate, statevector)
+    return gate
 
-def main():
-    # Initial statevector
-    statevector = np.array([1, 0, 0, 0], dtype=np.complex128)
+"""
+This function applies a series of gates to a 2-qubit state vector.
+The composed gate matrix, final state-vector as well as all intermediate transformations are returned.
+Input:
+    gate_matrices -> list of gates to apply in matrix form
+    state_vector -> initial state vector of the quantum system
+Returns:
+    state_vectors_prime -> list of transformed initial state vector after each operation is applied
+        [Includes the initial and final state-vectors]
+    composed_gate_matrix -> matrix representing the composition of all gates
+    final_state_vector -> the final state-vector after applying all operations
+"""
+def compose_and_apply_operations(gate_matrices, state_vector):
 
-    # User input
-    gate_sequence = input("Enter gate seq (x0,x1,y0,y1,z0,z1,h0,h1,cx,sw): ")
+    state_vectors_prime = [state_vector]
+    composed_gate_matrix = np.eye(4)
+    final_state_vector = state_vector
 
-    # Split gate sequence into individual gate names
-    gates = [gate_sequence[i:i+2] for i in range(0, len(gate_sequence), 2)]
+    for gate in gate_matrices:
+        composed_gate_matrix = composed_gate_matrix.dot(gate)
+        final_state_vector = np.dot(composed_gate_matrix, state_vector)
+        state_vectors_prime.append(final_state_vector)
+    
+    return state_vectors_prime, composed_gate_matrix, final_state_vector
 
-    print("Calculating the statevector...")
-    for gate_name in gates:
-        statevector = apply_gate(gate_name, statevector)
-        print(".", end="")
-    print("Final statevector:")
-    print_complex_matrix(statevector)
+"""
+Parses an input sequence of gates and returns a spliced gate sequence and a list of
+associated matrices
+Input:
+    input_sequence -> input sequence of gates
+        [I.e "h0cxh0h1"]]
+Returns:
+    gate_sequence -> list of gate names
+        [I.e ["h0", "cx", "h0", "h1"]]
+    gate_matrices -> list of gates in matrix form associated with gate_sequence
+"""
+def parse_gate_sequence(input_sequence):
+    gate_sequence = [input_sequence[i:i+2] for i in range(0, len(input_sequence), 2)]
+    gate_matrices = [get_gate_matrix(gate_name) for gate_name in gate_sequence]
+    return gate_sequence, gate_matrices
 
-    shots = 40
-    print(f"Running {shots} iterations...")
+"""
+Simulates a quantum circuit given the final state vector of a quantum system.
+Input:
+    state_vector -> the state vector of the quantum system 
+    shots -> the number of runs to simulate
+Returns:
+    results -> a dictionary of results for each possible observed state
+        key -> an element of {00, 01, 10, 11}
+        value -> number of shots this state was observed
+"""
+def simulate_circuit(state_vector, shots = 40):
     results = {bin(i)[2:].zfill(2): 0 for i in range(4)}
     for _ in range(shots):
         r = np.random.rand()
         for i in range(4):
-            if r < np.abs(statevector[:i+1]).sum():
+            if r < np.abs(state_vector[:i+1]).sum():
                 results[bin(i)[2:].zfill(2)] += 1
                 break
+    return results
 
+def print_results(results):
     print("Results:")
     for k, v in results.items():
         print(f"{k}: [{'Q' * v}] {v}")
+
+def main():
+    # Initial state-vector of |00>
+    init_vector = np.array([1, 0, 0, 0], dtype=np.complex128)
+    shots = 40
+
+    # User input
+    input_sequence = input("Enter gate seq (x0,x1,y0,y1,z0,z1,h0,h1,cx,sw): ")
+
+    gate_sequence, gate_matrices = parse_gate_sequence(input_sequence)
+    print("Calculating the statevector...")
+    state_vectors_prime, composed_gate_matrix, final_state_vector = compose_and_apply_operations(gate_matrices, init_vector)
+    print("Composed Gate Matrix:")
+    print_complex_matrix(composed_gate_matrix)
+    print("Final state vector:")
+    print_complex_matrix(final_state_vector)
+    
+    print(f"Simulating circuit for {shots} shots:")
+    results=simulate_circuit(final_state_vector, shots=shots)
+    print_results(results)
 
 if __name__ == "__main__":
     main()
