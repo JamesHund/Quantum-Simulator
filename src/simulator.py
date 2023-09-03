@@ -1,5 +1,46 @@
 import numpy as np
 from tabulate import tabulate
+from IPython.display import display, Latex
+
+def format_complex_to_latex(z):
+    """Helper function to format a complex number to a LaTeX-friendly string."""
+    real_part = round(z.real, 3)
+    imag_part = round(z.imag, 3)
+    
+    if imag_part == 0:
+        return f"{real_part:.3g}"  # 'g' format to remove trailing zeros
+    
+    if real_part == 0:
+        if imag_part == 1:
+            return "i"
+        if imag_part == -1:
+            return "-i"
+        return f"{imag_part:.3g}i"
+
+    sign = "+" if imag_part > 0 else "-"
+    imag_part = abs(imag_part)
+    
+    if imag_part == 1:
+        return f"{real_part:.3g} {sign} i"
+    else:
+        return f"{real_part:.3g} {sign} {imag_part:.3g}i"
+
+def display_complex_matrix(matrix):
+    """Display a complex matrix (or array) in LaTeX format."""
+    matrix = np.array(matrix)
+    
+    # If the input is a 1-dimensional array, reshape it to a column vector
+    if len(matrix.shape) == 1:
+        matrix = matrix.reshape(-1, 1)
+
+    latex_rows = []
+    for row in matrix:
+        latex_row = " & ".join([format_complex_to_latex(x) for x in row])
+        latex_rows.append(latex_row)
+
+    latex_matrix = r" \begin{pmatrix} " + r" \\ ".join(latex_rows) + r" \end{pmatrix} "
+    
+    display(Latex(latex_matrix))
 
 def print_complex_matrix(matrix):
     # Ensure input is a numpy array
@@ -36,14 +77,14 @@ def print_complex_matrix(matrix):
     
     print(tabulate(formatted_matrix, tablefmt="grid"))
 
-
 def get_gate_matrix(gate_name):
     # Define quantum gates as matrices
     x = np.array([[0, 1], [1, 0]])
     y = np.array([[0, -1j], [1j, 0]])
     z = np.array([[1, 0], [0, -1]])
     h = 1/np.sqrt(2) * np.array([[1, 1], [1, -1]])
-    cx = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])
+    cx_01 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]) # 0 as control, 1 as target
+    cx_10 = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]) # 1 as control, 0 as target
     sw = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
     
     if gate_name == "x0":
@@ -62,14 +103,17 @@ def get_gate_matrix(gate_name):
         gate = np.kron(h, np.eye(2))
     elif gate_name == "h1":
         gate = np.kron(np.eye(2), h)
-    elif gate_name == "cx":
-        gate = cx
+    elif gate_name == "cx01": # CNOT with qubit 0 as control and qubit 1 as target
+        gate = cx_01
+    elif gate_name == "cx10": # CNOT with qubit 1 as control and qubit 0 as target
+        gate = cx_10
     elif gate_name == "sw":
         gate = sw
     else:
         raise ValueError(f"Unknown gate: {gate_name}")
     
     return gate
+
 
 """
 This function applies a series of gates to a 2-qubit state vector.
@@ -89,9 +133,11 @@ def compose_and_apply_operations(gate_matrices, state_vector):
     composed_gate_matrix = np.eye(4)
     final_state_vector = state_vector
 
-    for gate in gate_matrices:
+    for gate in reversed(gate_matrices):
         composed_gate_matrix = composed_gate_matrix.dot(gate)
-        final_state_vector = np.dot(composed_gate_matrix, state_vector)
+    
+    for gate in gate_matrices:
+        final_state_vector = np.dot(gate, final_state_vector)
         state_vectors_prime.append(final_state_vector)
     
     return state_vectors_prime, composed_gate_matrix, final_state_vector
@@ -100,15 +146,15 @@ def compose_and_apply_operations(gate_matrices, state_vector):
 Parses an input sequence of gates and returns a spliced gate sequence and a list of
 associated matrices
 Input:
-    input_sequence -> input sequence of gates
-        [I.e "h0cxh0h1"]]
+    input_sequence -> input sequence of gates delimited by " "
+        [I.e "h0 cx01 h0 h1"]]
 Returns:
     gate_sequence -> list of gate names
         [I.e ["h0", "cx", "h0", "h1"]]
     gate_matrices -> list of gates in matrix form associated with gate_sequence
 """
 def parse_gate_sequence(input_sequence):
-    gate_sequence = [input_sequence[i:i+2] for i in range(0, len(input_sequence), 2)]
+    gate_sequence = input_sequence.split(" ")
     gate_matrices = [get_gate_matrix(gate_name) for gate_name in gate_sequence]
     return gate_sequence, gate_matrices
 
