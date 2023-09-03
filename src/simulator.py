@@ -173,7 +173,7 @@ def simulate_circuit(state_vector, shots = 40):
     for _ in range(shots):
         r = np.random.rand()
         for i in range(4):
-            if r < np.abs(state_vector[:i+1]).sum():
+            if r < (np.abs(state_vector[:i+1])**2).sum():
                 results[bin(i)[2:].zfill(2)] += 1
                 break
     return results
@@ -182,6 +182,13 @@ def print_results(results):
     print("Results:")
     for k, v in results.items():
         print(f"{k}: [{'Q' * v}] {v}")
+
+def print_simulation_steps(gate_matrices, state_vectors_prime):
+    for i in range(len(gate_matrices)):
+        print_complex_matrix(state_vectors_prime[i])
+        print_complex_matrix(gate_matrices[i])
+    
+    print_complex_matrix(state_vectors_prime[-1])
 
 def main():
     # Initial state-vector of |00>
