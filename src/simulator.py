@@ -77,44 +77,63 @@ def print_complex_matrix(matrix):
     
     print(tabulate(formatted_matrix, tablefmt="grid"))
 
-def get_gate_matrix(gate_name):
+def get_gate_matrix(gate_code):
     # Define quantum gates as matrices
     x = np.array([[0, 1], [1, 0]])
     y = np.array([[0, -1j], [1j, 0]])
     z = np.array([[1, 0], [0, -1]])
     h = 1/np.sqrt(2) * np.array([[1, 1], [1, -1]])
-    cx_01 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]) # 0 as control, 1 as target
-    cx_10 = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]) # 1 as control, 0 as target
-    sw = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]])
-    
-    if gate_name == "x0":
-        gate = np.kron(x, np.eye(2))
-    elif gate_name == "x1":
-        gate = np.kron(np.eye(2), x)
-    elif gate_name == "y0":
-        gate = np.kron(y, np.eye(2))
-    elif gate_name == "y1":
-        gate = np.kron(np.eye(2), y)
-    elif gate_name == "z0":
-        gate = np.kron(z, np.eye(2))
-    elif gate_name == "z1":
-        gate = np.kron(np.eye(2), z)
-    elif gate_name == "h0":
-        gate = np.kron(h, np.eye(2))
-    elif gate_name == "h1":
-        gate = np.kron(np.eye(2), h)
-    elif gate_name == "cx01": # CNOT with qubit 0 as control and qubit 1 as target
-        gate = cx_01
-    elif gate_name == "cx10": # CNOT with qubit 1 as control and qubit 0 as target
-        gate = cx_10
-    elif gate_name == "sw":
-        gate = sw
+
+    #for use in calculating oracle matrices
+    cx_01 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])# 0 as control, 1 as target
+    x0 = np.kron(x, np.eye(2))
+
+    gate_dict = {
+        "cx_01": np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]),# 0 as control, 1 as target
+        "cx_10": np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]), # 1 as control, 0 as target
+        "sw": np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]),
+        "x0": np.kron(x, np.eye(2)),
+        "x1": np.kron(np.eye(2), x),
+        "y0": np.kron(y, np.eye(2)),
+        "y1": np.kron(np.eye(2), y),
+        "z0": np.kron(z, np.eye(2)),
+        "z1": np.kron(np.eye(2), z),
+        "h0": np.kron(h, np.eye(2)),
+        "h1": np.kron(np.eye(2), h),
+
+        "uf0": np.eye(4),#f0(0) = 0 and f0(1) = 0
+        "uf1": x0.copy(), #f1(0) = 1 and f1(1) = 1
+        "uf2": cx_01.copy(),#f2(0) = 0 and f2(1) = 1
+        "uf3": x0.dot(cx_01).dot(x0) #f3(0) = 1 and f3(1) = 0
+    }
+    if gate_code in gate_dict:
+        return gate_dict[gate_code]
     else:
-        raise ValueError(f"Unknown gate: {gate_name}")
+        raise ValueError(f"Unknown gate code: {gate_code}")
     
     return gate
 
-
+def gate_description_dictionary():
+    # Dictionary mapping from gate codes to their descriptions
+    gate_descriptions = {
+        "x0": "X gate on qubit 0",
+        "x1": "X gate on qubit 1",
+        "y0": "Y gate on qubit 0",
+        "y1": "Y gate on qubit 1",
+        "z0": "Z gate on qubit 0",
+        "z1": "Z gate on qubit 1",
+        "h0": "Hadamard gate on qubit 0",
+        "h1": "Hadamard gate on qubit 1",
+        "cx01": "CNOT gate with qubit 0 as control and qubit 1 as target",
+        "cx10": "CNOT gate with qubit 1 as control and qubit 0 as target",
+        "sw": "SWAP gate between qubits 0 and 1",
+        "uf0": "Uf matrix for function f0: constant with f(0) = 0 and f(1) = 0",
+        "uf1": "Uf matrix for function f1: constant with f(0) = 1 and f(1) = 1",
+        "uf2": "Uf matrix for function f2: balanced with f(0) = 0 and f(1) = 1",
+        "uf3": "Uf matrix for function f3: balanced with f(0) = 1 and f(1) = 0"
+    }
+    
+    return gate_descriptions
 """
 This function applies a series of gates to a 2-qubit state vector.
 The composed gate matrix, final state-vector as well as all intermediate transformations are returned.
@@ -183,12 +202,14 @@ def print_results(results):
     for k, v in results.items():
         print(f"{k}: [{'Q' * v}] {v}")
 
-def print_simulation_steps(gate_matrices, state_vectors_prime):
+def print_simulation_steps(gate_sequence, gate_matrices, state_vectors_prime):
+    gate_description = gate_description_dictionary()
     for i in range(len(gate_matrices)):
-        print_complex_matrix(state_vectors_prime[i])
-        print_complex_matrix(gate_matrices[i])
+        display_complex_matrix(state_vectors_prime[i])
+        print(f"Applying: {gate_description[gate_sequence[i]]}")
+        display_complex_matrix(gate_matrices[i])
     
-    print_complex_matrix(state_vectors_prime[-1])
+    display_complex_matrix(state_vectors_prime[-1])
 
 def main():
     # Initial state-vector of |00>
