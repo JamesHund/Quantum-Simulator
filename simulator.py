@@ -94,10 +94,11 @@ def get_gate_matrix(gate_code):
     #for use in calculating oracle matrices
     cx_01 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])# 0 as control, 1 as target
     x0 = np.kron(x, np.eye(2))
+    x1 = np.kron(np.eye(2), x)
 
     #oracle functions
     uf0 = np.eye(4)
-    uf1 = x0.copy() #f1(0) = 1 and f1(1) = 1
+    uf1 = x1.copy() #f1(0) = 1 and f1(1) = 1
     uf2 = cx_01.copy()#f2(0) = 0 and f2(1) = 1
     uf3 = x0.dot(cx_01).dot(x0) #f3(0) = 1 and f3(1) = 0
     oracle = random.choice([uf0, uf1, uf2, uf3])
