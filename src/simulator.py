@@ -44,6 +44,7 @@ def display_complex_matrix(matrix):
     display(Latex(latex_matrix))
 
 def print_complex_matrix(matrix):
+    """Prints a complex matrix in terminal friendly format"""
     # Ensure input is a numpy array
     matrix = np.array(matrix)
     
@@ -79,6 +80,11 @@ def print_complex_matrix(matrix):
     print(tabulate(formatted_matrix, tablefmt="grid"))
 
 def get_gate_matrix(gate_code):
+    """
+    Returns the operator matrix associated with gate_code
+    Returns null for an invalid gate code
+    Valid Gates: x0 x1 y0 y1 z0 z1 h0 h1 cx01 cx10 sw uf0 uf1 uf2 uf3 oracle
+    """
     # Define quantum gates as matrices
     x = np.array([[0, 1], [1, 0]])
     y = np.array([[0, -1j], [1j, 0]])
@@ -119,9 +125,7 @@ def get_gate_matrix(gate_code):
     if gate_code in gate_dict:
         return gate_dict[gate_code]
     else:
-        raise ValueError(f"Unknown gate code: {gate_code}")
-    
-    return gate
+        return None
 
 def gate_description_dictionary():
     # Dictionary mapping from gate codes to their descriptions
@@ -141,7 +145,7 @@ def gate_description_dictionary():
         "uf1": "Uf matrix for function f1: constant with f(0) = 1 and f(1) = 1",
         "uf2": "Uf matrix for function f2: balanced with f(0) = 0 and f(1) = 1",
         "uf3": "Uf matrix for function f3: balanced with f(0) = 1 and f(1) = 0",
-        "oracle": "Unknown unitary matrix Uf encoding a function f:{0,1}->{0,1}"
+        "oracle": "Random unitary matrix Uf encoding a function f:{0,1}->{0,1}"
     }
     
     return gate_descriptions
@@ -188,7 +192,11 @@ Returns:
 def parse_gate_sequence(input_sequence):
     gate_sequence = input_sequence.split(" ")
     gate_matrices = [get_gate_matrix(gate_name) for gate_name in gate_sequence]
-    return gate_sequence, gate_matrices
+
+    # Finding invalid gate codes
+    invalid_gate_codes = {gate_sequence[i] for i, matrix in enumerate(gate_matrices) if matrix is None}
+
+    return gate_sequence, gate_matrices, invalid_gate_codes
 
 """
 Simulates a quantum circuit given the final state vector of a quantum system.
@@ -229,21 +237,40 @@ def main():
     shots = 100
 
     gate_dict = gate_description_dictionary()
-    input_prompt = "-------------2-Qubit Quantum Simulator--------------\n" + \
-        f"Available Gates: {' '.join(gate_dict.keys())}\n" + \
-        "Run 'python simulator.py --help' for more info\n" + \
-        "Type 'exit' to quit\n" + \
-        "Enter a space delimited gate sequence:\n" +  \
+
+    welcome_prompt = f"Available Gates: {' '.join(gate_dict.keys())}\n" + \
+        "Enter 'exit' to quit the simulator.\n" + \
+        "Enter 'help' for a description of the gates"
+
+    input_prompt = "\nEnter a space-delimited gate sequence:\n" +  \
         "==> "
+
+    print(welcome_prompt)
     # User input
     running = True
     while(running):
-        input_sequence = input(input_prompt)
-        if input_sequence == "exit":
+        try:
+            input_sequence = input(input_prompt)
+        except EOFError:
+            print("exiting...")
             running = False
             continue
 
-        gate_sequence, gate_matrices = parse_gate_sequence(input_sequence)
+        if input_sequence == "exit":
+            print("exiting...")
+            running = False
+            continue
+        elif input_sequence == "help":
+            print("----------------------------------------------------------")
+            for key, value in gate_dict.items():
+                print(f"   {key}: {value}")
+            print("----------------------------------------------------------")
+            continue
+
+        gate_sequence, gate_matrices, invalid_codes = parse_gate_sequence(input_sequence)
+        if invalid_codes:
+            print(f"The following gate codes are invalid: {' '.join(invalid_codes)}")
+            continue
         print("Calculating...")
         state_vectors_prime, composed_gate_matrix, final_state_vector = compose_and_apply_operations(gate_matrices)
         print("Composed Gate Matrix:")
