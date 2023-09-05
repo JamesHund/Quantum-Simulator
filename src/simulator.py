@@ -1,6 +1,7 @@
 import numpy as np
 from tabulate import tabulate
 from IPython.display import display, Latex
+import random
 
 def format_complex_to_latex(z):
     """Helper function to format a complex number to a LaTeX-friendly string."""
@@ -88,9 +89,15 @@ def get_gate_matrix(gate_code):
     cx_01 = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])# 0 as control, 1 as target
     x0 = np.kron(x, np.eye(2))
 
+    #oracle functions
+    uf0 = np.eye(4)
+    uf1 = x0.copy() #f1(0) = 1 and f1(1) = 1
+    uf2 = cx_01.copy()#f2(0) = 0 and f2(1) = 1
+    uf3 = x0.dot(cx_01).dot(x0) #f3(0) = 1 and f3(1) = 0
+    oracle = random.choice([uf0, uf1, uf2, uf3])
     gate_dict = {
-        "cx_01": np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]),# 0 as control, 1 as target
-        "cx_10": np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]), # 1 as control, 0 as target
+        "cx01": np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]]),# 0 as control, 1 as target
+        "cx10": np.array([[1, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 0, 0]]), # 1 as control, 0 as target
         "sw": np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]),
         "x0": np.kron(x, np.eye(2)),
         "x1": np.kron(np.eye(2), x),
@@ -101,11 +108,14 @@ def get_gate_matrix(gate_code):
         "h0": np.kron(h, np.eye(2)),
         "h1": np.kron(np.eye(2), h),
 
-        "uf0": np.eye(4),#f0(0) = 0 and f0(1) = 0
-        "uf1": x0.copy(), #f1(0) = 1 and f1(1) = 1
-        "uf2": cx_01.copy(),#f2(0) = 0 and f2(1) = 1
-        "uf3": x0.dot(cx_01).dot(x0) #f3(0) = 1 and f3(1) = 0
+        "uf0": uf0,
+        "uf1": uf1,
+        "uf2": uf2,
+        "uf3": uf3,
+        "oracle": oracle
+
     }
+    
     if gate_code in gate_dict:
         return gate_dict[gate_code]
     else:
@@ -130,27 +140,30 @@ def gate_description_dictionary():
         "uf0": "Uf matrix for function f0: constant with f(0) = 0 and f(1) = 0",
         "uf1": "Uf matrix for function f1: constant with f(0) = 1 and f(1) = 1",
         "uf2": "Uf matrix for function f2: balanced with f(0) = 0 and f(1) = 1",
-        "uf3": "Uf matrix for function f3: balanced with f(0) = 1 and f(1) = 0"
+        "uf3": "Uf matrix for function f3: balanced with f(0) = 1 and f(1) = 0",
+        "oracle": "Unknown unitary matrix Uf encoding a function f:{0,1}->{0,1}"
     }
     
     return gate_descriptions
+
 """
 This function applies a series of gates to a 2-qubit state vector.
 The composed gate matrix, final state-vector as well as all intermediate transformations are returned.
 Input:
     gate_matrices -> list of gates to apply in matrix form
-    state_vector -> initial state vector of the quantum system
+    init_vector -> initial state vector of the quantum system
+        [By default set to |00>]
 Returns:
-    state_vectors_prime -> list of transformed initial state vector after each operation is applied
+    state_vectors_prime -> list of transformed state vectors after each operation is applied
         [Includes the initial and final state-vectors]
     composed_gate_matrix -> matrix representing the composition of all gates
     final_state_vector -> the final state-vector after applying all operations
 """
-def compose_and_apply_operations(gate_matrices, state_vector):
+def compose_and_apply_operations(gate_matrices, init_vector = np.array([1, 0, 0, 0], dtype=np.complex128)):
 
-    state_vectors_prime = [state_vector]
+    state_vectors_prime = [init_vector]
     composed_gate_matrix = np.eye(4)
-    final_state_vector = state_vector
+    final_state_vector = init_vector
 
     for gate in reversed(gate_matrices):
         composed_gate_matrix = composed_gate_matrix.dot(gate)
@@ -200,7 +213,8 @@ def simulate_circuit(state_vector, shots = 40):
 def print_results(results):
     print("Results:")
     for k, v in results.items():
-        print(f"{k}: [{'Q' * v}] {v}")
+        print(f"|{k}>: [{'Q' * v}] {v}")
+    print("---Using Tensor Product Convention (Leftmost Qubit is Qubit 0)---")
 
 def print_simulation_steps(gate_sequence, gate_matrices, state_vectors_prime):
     gate_description = gate_description_dictionary()
@@ -212,24 +226,34 @@ def print_simulation_steps(gate_sequence, gate_matrices, state_vectors_prime):
     display_complex_matrix(state_vectors_prime[-1])
 
 def main():
-    # Initial state-vector of |00>
-    init_vector = np.array([1, 0, 0, 0], dtype=np.complex128)
-    shots = 40
+    shots = 100
 
+    gate_dict = gate_description_dictionary()
+    input_prompt = "-------------2-Qubit Quantum Simulator--------------\n" + \
+        f"Available Gates: {' '.join(gate_dict.keys())}\n" + \
+        "Run 'python simulator.py --help' for more info\n" + \
+        "Type 'exit' to quit\n" + \
+        "Enter a space delimited gate sequence:\n" +  \
+        "==> "
     # User input
-    input_sequence = input("Enter gate seq (x0,x1,y0,y1,z0,z1,h0,h1,cx,sw): ")
+    running = True
+    while(running):
+        input_sequence = input(input_prompt)
+        if input_sequence == "exit":
+            running = False
+            continue
 
-    gate_sequence, gate_matrices = parse_gate_sequence(input_sequence)
-    print("Calculating the statevector...")
-    state_vectors_prime, composed_gate_matrix, final_state_vector = compose_and_apply_operations(gate_matrices, init_vector)
-    print("Composed Gate Matrix:")
-    print_complex_matrix(composed_gate_matrix)
-    print("Final state vector:")
-    print_complex_matrix(final_state_vector)
-    
-    print(f"Simulating circuit for {shots} shots:")
-    results=simulate_circuit(final_state_vector, shots=shots)
-    print_results(results)
+        gate_sequence, gate_matrices = parse_gate_sequence(input_sequence)
+        print("Calculating...")
+        state_vectors_prime, composed_gate_matrix, final_state_vector = compose_and_apply_operations(gate_matrices)
+        print("Composed Gate Matrix:")
+        print_complex_matrix(composed_gate_matrix)
+        print("Final State Vector:")
+        print_complex_matrix(final_state_vector)
+        
+        print(f"Simulating circuit for {shots} shots:")
+        results=simulate_circuit(final_state_vector, shots=shots)
+        print_results(results)
 
 if __name__ == "__main__":
     main()
