@@ -1,9 +1,9 @@
-# QC Assignment 1 Readme
-To run the simulator type in the following command:
+# 2 bit Quantum Computer Simulator Readme
+To run the simulator, run the following command:
 
 ```python simulator.py```
 
-The report is located at `report.ipynb`.
+For more information about how it works: [Demo Notebook](demo.ipynb).
 
 ## Installing Dependencies from `requirements.txt`
 
